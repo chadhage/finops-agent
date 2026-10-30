@@ -3,6 +3,10 @@
 A workspace-scoped, read-only VS Code custom agent for Azure workload cost
 analysis using the confirmed invoker's identity.
 
+**[Explore the FinOpsAgent microsite](https://chadhage.github.io/finops-agent/)**:
+why this repository exists, why Zava should care, how the code works, and who
+should use it.
+
 ## Getting started
 
 ### 1. Prepare your environment
@@ -274,6 +278,30 @@ live Portal parity, and NOT RUN checks; none is silently inferred from mocks.
 
 Existing product/workflow context remains in [the wiki](wiki/); this pack does
 not add enforcement, deployment, subscription vending, or policy rollout.
+
+## Public microsite
+
+The [microsite](site/index.html) is a self-contained explanation of the project,
+not a live billing dashboard or the local verification utility. It contains
+only public-safe, illustrative content. It does not collect credentials, query
+Azure, or upload customer evidence.
+
+Preview it locally:
+
+```powershell
+python -m http.server 8000 --bind 127.0.0.1 --directory site
+```
+
+Open `http://127.0.0.1:8000/`. Validate the static publication boundary with:
+
+```powershell
+python tools\validate_microsite.py
+```
+
+The [Pages workflow](.github/workflows/pages.yml) validates and publishes only
+the [site directory](site/) on relevant pushes to `main` or manual dispatch.
+The wiki, local configuration, test-run evidence, and application code are not
+included in the Pages artifact. This site check is not FinOps/live-cost acceptance.
 
 ## License and notices
 

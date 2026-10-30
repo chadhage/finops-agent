@@ -69,3 +69,18 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE
+
+3. Microsite theme recipe
+-------------------------
+
+The theme-detection snippet and Clawpilot CSS variable recipe in
+site/index.html were adapted from the supplied web-artifacts-builder skill.
+The microsite adds original explanatory content, layout, responsive rules,
+and interactions. The skill's component bundles and runtime dependencies
+are not included.
+
+Copyright 2026 Anthropic, PBC.
+License: Apache License, Version 2.0.
+The full supplied license and modification notice are distributed in
+site/licenses/Apache-2.0.txt and are linked from the public microsite.
+This attribution does not imply endorsement.
