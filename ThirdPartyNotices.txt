@@ -1,0 +1,71 @@
+Third-party attribution and license notices
+==========================================
+
+The repository's own material is licensed under CC BY 4.0; see LICENSE.
+The notices below preserve separately applicable upstream terms. They do
+not make the entire repository MIT-licensed or imply Microsoft endorsement.
+
+1. MicrosoftDocs Cost Management Skill
+--------------------------------------
+
+Title: Cost Management Skill
+Attribution: MicrosoftDocs/Agent-Skills contributors
+Local adaptation: .github/skills/azure-cost-management/SKILL.md
+Reviewed source revision: 95544200a6621ee7481b253beb115ac0be701689
+Source:
+https://github.com/MicrosoftDocs/Agent-Skills/blob/95544200a6621ee7481b253beb115ac0be701689/skills/azure-cost-management/SKILL.md
+Source license:
+https://github.com/MicrosoftDocs/Agent-Skills/blob/95544200a6621ee7481b253beb115ac0be701689/LICENSE
+License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+License URL: https://creativecommons.org/licenses/by/4.0/
+Full legal text: LICENSE in this repository.
+
+Changes: curated the documentation index, replaced hard-coded tool
+assumptions with discovery and web fallback, added privacy and invoker/
+evidence integration, and limited configuration/deployment topics to
+explanation without execution. The original source attribution and change
+description remain in the local skill. No upstream endorsement is implied.
+The CC BY 4.0 warranty and liability disclaimer applies.
+
+2. Microsoft Azure cost-analysis guidance
+-----------------------------------------
+
+The historical-spend, bill-change, AKS, and AI analysis guidance references
+and adapts guidance from microsoft/azure-skills. Its MCP servers and tools
+are not bundled or installed by this repository.
+
+Attribution: Microsoft Corporation
+Verified source revision: 39b8cb013c5d0886e8819e7147f1eec1eebc0cd6
+Source:
+https://github.com/microsoft/azure-skills/blob/39b8cb013c5d0886e8819e7147f1eec1eebc0cd6/.github/plugins/azure-cost/skills/cost-analysis/SKILL.md
+Source license:
+https://github.com/microsoft/azure-skills/blob/39b8cb013c5d0886e8819e7147f1eec1eebc0cd6/LICENSE
+
+Local changes: integrated the guidance with invoker-approved scope,
+raw-response capture, deterministic decimal arithmetic, full pagination,
+independent-reference reconciliation, and explicit capability limits.
+The applicable upstream MIT notice is retained below; the upstream
+copyright and permissions are not replaced by the repository-wide
+CC BY 4.0 license.
+
+MIT License
+
+Copyright 2025 (c) Microsoft Corporation.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE

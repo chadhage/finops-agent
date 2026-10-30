@@ -274,3 +274,18 @@ live Portal parity, and NOT RUN checks; none is silently inferred from mocks.
 
 Existing product/workflow context remains in [the wiki](wiki/); this pack does
 not add enforcement, deployment, subscription vending, or policy rollout.
+
+## License and notices
+
+This repository, including its original code, agents, skills, tests, and
+documentation, is licensed under
+[Creative Commons Attribution 4.0 International (CC BY 4.0)](LICENSE), not MIT.
+Retain attribution and identify modifications when sharing or adapting material.
+Separately identified upstream material retains its applicable terms; see
+[ThirdPartyNotices.txt](ThirdPartyNotices.txt).
+
+See [NOTICE.md](NOTICE.md) for warranty, support, trademark, and non-endorsement
+notices. The material is provided as-is and as-available under the license.
+Microsoft product references and upstream documentation do not make this an
+officially supported or Microsoft-endorsed product. No rights to Microsoft or
+other third-party trademarks are granted.
