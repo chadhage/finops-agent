@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "isExample": true,
+  "source": "portal-query-export",
+  "tenantId": "<same-confirmed-tenant-uuid>",
+  "principalId": "<same-confirmed-invoker-object-uuid>",
+  "capturedAt": "<actual-Portal-capture-UTC-timestamp>",
+  "portalViewUrl": "https://portal.azure.com/#<actual-Cost-Analysis-view>",
+  "attestation": {
+    "exportedFromAzurePortal": false,
+    "sameViewScopeAndFilters": false,
+    "noSecretsIncluded": false,
+    "confirmedByPrincipalId": "<confirmed-invoker-object-uuid>",
+    "confirmedAt": "<actual-user-confirmation-UTC-timestamp>"
+  },
+  "displayedTotals": [
+    {
+      "currency": "USD",
+      "amount": "0.01",
+      "decimalPlaces": 2
+    }
+  ],
+  "captures": [
+    {
+      "requestId": "<detail-request-id-from-approved-plan>",
+      "requestBody": {},
+      "pages": [
+        {
+          "path": "portal-detail-response.example.json",
+          "url": "<exact-detail-query-URL-from-plan-and-Portal>",
+          "status": 200
+        }
+      ]
+    },
+    {
+      "requestId": "<control-request-id-from-approved-plan>",
+      "requestBody": {},
+      "pages": [
+        {
+          "path": "portal-control-response.example.json",
+          "url": "<exact-control-query-URL-from-plan-and-Portal>",
+          "status": 200
+        }
+      ]
+    }
+  ]
+}

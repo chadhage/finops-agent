@@ -1,0 +1,13 @@
+{
+  "isExample": true,
+  "properties": {
+    "columns": [
+      {"name": "PreTaxCost", "type": "Number"},
+      {"name": "Currency", "type": "String"}
+    ],
+    "rows": [
+      [0.008, "USD"]
+    ],
+    "nextLink": null
+  }
+}

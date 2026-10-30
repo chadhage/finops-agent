@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "isExample": true,
+  "planPath": "<local-path-to-approved-plan.json>",
+  "portalIndexPath": "portal-reference.example.json",
+  "actualPath": "<local-path-to-saved-agent-capture.json>",
+  "approvedPlanSha256": "<sha256-from-approved-plan>",
+  "maxEvidenceAgeSeconds": 3600,
+  "liveApproval": {
+    "confirmed": false,
+    "tenantId": "<confirmed-tenant-uuid>",
+    "principalId": "<confirmed-invoker-object-uuid>",
+    "subscriptionIds": [
+      "<exact-selected-subscription-uuid>"
+    ],
+    "planSha256": "<sha256-from-approved-plan>",
+    "confirmedAt": "<YYYY-MM-DDTHH:MM:SSZ>",
+    "expiresAt": "<YYYY-MM-DDTHH:MM:SSZ>"
+  }
+}

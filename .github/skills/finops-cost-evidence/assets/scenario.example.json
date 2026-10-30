@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "tenantId": "10000000-0000-0000-0000-000000000001",
+  "principalId": "20000000-0000-0000-0000-000000000001",
+  "approvedSubscriptionIds": [
+    "30000000-0000-0000-0000-000000000001"
+  ],
+  "period": {
+    "from": "2026-09-01T00:00:00Z",
+    "to": "2026-09-30T23:59:59Z"
+  },
+  "costBasis": "ActualCost",
+  "selection": {
+    "subscriptionNames": [
+      "REPLACE WITH EXACT APPROVED SUBSCRIPTION NAME"
+    ],
+    "tags": [
+      {
+        "key": "Application",
+        "values": [
+          "REPLACE WITH EXACT WORKLOAD TAG VALUE"
+        ]
+      }
+    ],
+    "regions": [
+      "East US"
+    ]
+  }
+}

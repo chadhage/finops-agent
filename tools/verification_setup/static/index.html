@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FinOps verification setup</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">F</span> FinOps <span class="brand-divider">/</span> Verification</div>
+    <span class="local-badge"><span class="dot"></span> Local only</span>
+  </header>
+  <main>
+    <section class="intro">
+      <div>
+        <p class="eyebrow">EVIDENCE BEFORE ACCEPTANCE</p>
+        <h1>Verification workspace</h1>
+        <p class="lede">Set up the inputs. Run the checks. Inspect every outcome.</p>
+      </div>
+      <div class="boundary-note">
+        <strong>No live Azure execution</strong>
+        <span>This page uses saved evidence or synthetic offline checks. It never signs in, queries Azure, or changes resources.</span>
+      </div>
+    </section>
+
+    <ol class="steps" aria-label="Verification workflow">
+      <li id="step-setup" class="current"><span>1</span> Configure inputs</li>
+      <li id="step-review"><span>2</span> Review generated JSON</li>
+      <li id="step-results"><span>3</span> Run and inspect</li>
+    </ol>
+    <div id="connection" role="status" aria-live="polite">Connecting to the local setup server...</div>
+    <div id="error" class="error-banner" role="alert" hidden></div>
+
+    <div class="workspace-grid">
+      <section class="panel setup-panel" aria-labelledby="setup-title">
+        <div class="panel-heading"><span class="section-number">01</span><div><h2 id="setup-title">Configure verification</h2><p>All files stay on this machine.</p></div></div>
+        <form id="setup-form">
+          <label for="mode">Verification mode</label>
+          <select id="mode">
+            <option value="evidence">Captured Portal evidence - acceptance gate</option>
+            <option value="offline">Offline developer checks - not acceptance</option>
+          </select>
+          <p id="mode-help" class="help">Compare genuine Portal exports with a saved invoker-bound query after all offline checks pass.</p>
+
+          <fieldset id="evidence-fields">
+            <legend>Approved scope and saved evidence</legend>
+            <label for="plan-path">Approved plan JSON path</label>
+            <div class="input-action"><input id="plan-path" type="text" required placeholder=".finops-runs\my-evidence\plan.json"><button id="load-plan" type="button" class="secondary">Load plan</button></div>
+            <p class="help">Use an existing, unchanged plan with an independent exact resource-set reference. Paths are relative to the workspace or absolute.</p>
+            <div id="plan-summary" class="plan-summary" hidden></div>
+            <label for="approved-hash">Exact approved plan SHA-256</label>
+            <input id="approved-hash" class="mono" type="text" required pattern="[a-f0-9]{64}" maxlength="64" autocomplete="off" placeholder="Review the plan, then paste its 64-character hash">
+            <label for="actual-path">Saved invoker-bound query capture path</label>
+            <input id="actual-path" type="text" required placeholder=".finops-runs\my-evidence\actual.json">
+            <label for="max-age">Maximum evidence age (seconds)</label>
+            <input id="max-age" type="number" min="1" step="1" required>
+            <p class="help">This applies to real capture/attestation times, not the frozen offline-test clock.</p>
+
+            <label for="reference-mode">Portal reference index</label>
+            <select id="reference-mode"><option value="create">Build a new reference index from exported files</option><option value="existing">Use an existing authoritative reference index</option></select>
+            <fieldset id="existing-reference" hidden disabled>
+              <legend>Existing index</legend>
+              <label for="index-path">Portal reference-index JSON path</label>
+              <input id="index-path" type="text" required placeholder=".finops-runs\my-evidence\portal-reference.json">
+              <p class="help">Page paths are resolved relative to this index. The page snapshots the files without overwriting the original index.</p>
+            </fieldset>
+            <fieldset id="new-reference">
+              <legend>Portal export details</legend>
+              <label for="captured-at">Actual Portal capture time (UTC)</label>
+              <input id="captured-at" type="text" required placeholder="YYYY-MM-DDTHH:MM:SSZ">
+              <label for="portal-url">Actual Portal Cost Analysis view URL</label>
+              <input id="portal-url" type="url" required placeholder="https://portal.azure.com/#your-actual-view">
+              <p class="help">No credentials or query parameters. This must identify the view you actually used.</p>
+              <div class="subheading"><h3>Displayed currency totals</h3><button id="add-currency" type="button" class="text-button">+ Add currency</button></div>
+              <p class="help">Enter the full observed amount as text, without symbols, separators, K/M abbreviations, or currency conversion. Declare the actual display precision.</p>
+              <div id="currencies"></div>
+              <div class="subheading"><h3>Portal requests and raw pages</h3></div>
+              <p class="help">Load the plan to see every required request. Supply actual sanitized Portal request-body files and every raw response page. Expected plan bodies are references, not exported evidence.</p>
+              <div id="requests" class="request-list"><p class="empty-note">Load the approved plan to configure its detail and control requests.</p></div>
+            </fieldset>
+            <fieldset class="attestations">
+              <legend>Explicit operator confirmation</legend>
+              <p class="help">Do not approve examples, fabricated data, or another person's capture. These are your attestations, not browser-origin authentication.</p>
+              <label class="checkbox"><input id="attest-origin" type="checkbox" required><span>The request and response files were exported from Azure Portal.</span></label>
+              <label class="checkbox"><input id="attest-scope" type="checkbox" required><span>The Portal view uses exactly the approved identity, scope, dates, cost basis, and filters.</span></label>
+              <label class="checkbox"><input id="attest-secrets" type="checkbox" required><span>All files are sanitized: no tokens, Authorization headers, cookies, passwords, or unsanitized HAR files.</span></label>
+              <label class="checkbox"><input id="attest-actual" type="checkbox" required><span>The saved actual capture came from my approved invoker-bound Azure query.</span></label>
+              <label for="confirmed-at">Actual confirmation time (UTC)</label>
+              <div class="input-action"><input id="confirmed-at" type="text" required placeholder="YYYY-MM-DDTHH:MM:SSZ"><button id="confirm-now" type="button" class="secondary">Use current UTC</button></div>
+            </fieldset>
+          </fieldset>
+
+          <details class="runner-options" open>
+            <summary>Test runner settings</summary>
+            <div class="form-grid">
+              <div><label for="repeat">Repetitions per phase</label><input id="repeat" type="number" min="1" step="1" required></div>
+              <div><label for="seed">Shuffle seed</label><input id="seed" type="number" step="1" required></div>
+              <div><label for="timeout">Timeout per sweep (seconds)</label><input id="timeout" type="number" min="1" step="1" required></div>
+              <div><label for="clock">Frozen offline clock (UTC)</label><input id="clock" type="text" required placeholder="YYYY-MM-DDTHH:MM:SSZ"></div>
+            </div>
+            <p class="help">Every negative sweep finishes before positives. Failures are retained; they are never retried into a passing result.</p>
+          </details>
+          <button id="prepare" type="submit" class="primary wide">Generate setup for review</button>
+          <p id="roots" class="help roots"></p>
+        </form>
+      </section>
+
+      <div class="outcome-column">
+        <section id="review-panel" class="panel" aria-labelledby="review-title">
+          <div class="panel-heading"><span class="section-number">02</span><div><h2 id="review-title">Review before running</h2><p>Generating a config does not invoke tests.</p></div></div>
+          <p id="review-empty" class="empty-note">Complete the form to generate a private, new setup directory. Your source files will not be modified.</p>
+          <div id="review-content" hidden>
+            <p id="review-id" class="help mono"></p>
+            <details open><summary>Runner command</summary><pre id="command"></pre></details>
+            <div id="config-previews"></div>
+            <p class="callout">Review the JSON and immutable plan. Clicking Run invokes the existing suite, without worker-only shortcuts or live Azure access.</p>
+            <button id="run" type="button" class="primary wide">Run verification suite</button>
+          </div>
+        </section>
+
+        <section class="panel" aria-labelledby="results-title">
+          <div class="panel-heading"><span class="section-number">03</span><div><h2 id="results-title">Verification outcomes</h2><p>Read directly from saved runner reports.</p></div></div>
+          <div class="input-action"><label class="sr-only" for="history">Saved local setups and runs</label><select id="history"><option value="">Select a saved setup or run</option></select><button id="refresh" type="button" class="secondary">Refresh</button></div>
+          <div id="run-status" class="status-box" role="status" aria-live="polite">No run selected.</div>
+          <div id="outcomes" hidden>
+            <div class="metrics">
+              <div><span id="attempt-count">0</span><small>attempts recorded</small></div>
+              <div><span id="pass-count">0</span><small>passed attempts</small></div>
+              <div><span id="failure-count">0</span><small>other outcomes</small></div>
+            </div>
+            <dl class="checks">
+              <div><dt>All negative attempts finished</dt><dd id="negative-state">Not established</dd></div>
+              <div><dt>Positive phase</dt><dd id="positive-state">Not started</dd></div>
+              <div><dt>Source remained unchanged</dt><dd id="source-state">Not established</dd></div>
+              <div><dt>Portal parity</dt><dd id="portal-state">NOT RUN</dd></div>
+              <div><dt>Acceptance validated</dt><dd id="acceptance-state">No</dd></div>
+              <div><dt>Fresh live Azure verification</dt><dd id="live-state">NOT RUN</dd></div>
+            </dl>
+            <div id="run-errors" class="error-detail" hidden></div>
+            <h3>Sweep progress</h3>
+            <div class="table-wrap"><table><thead><tr><th>Phase / sweep</th><th>Attempted</th><th>Worker exit</th></tr></thead><tbody id="sweeps"></tbody></table></div>
+            <div id="parity-comparison"></div>
+            <div class="subheading"><h3>Test outcomes and diagnostics</h3><label class="sr-only" for="result-filter">Filter test outcomes</label><select id="result-filter"><option value="all">All tests</option><option value="failures">Non-passing tests</option></select></div>
+            <p class="help">Expand a test to inspect every recorded attempt, diagnostic, warning, and captured output.</p>
+            <div id="test-results" class="test-results"></div>
+          </div>
+          <details><summary>Runner log (last 24 KB)</summary><pre id="runner-log">No log yet.</pre></details>
+          <details open><summary>Saved configs, evidence, and reports</summary><div id="artifacts" class="artifact-list"><p class="help">Artifacts appear after setup generation.</p></div></details>
+          <p class="help coverage">Offline success is not Portal acceptance. Captured-evidence parity is not a fresh Azure query. Model conversations and installed-browser PDF behavior remain separate, unexecuted acceptance layers.</p>
+        </section>
+      </div>
+    </div>
+    <footer><span>FinOpsAgent / Local verification utility</span><span id="output-root"></span></footer>
+  </main>
+</body>
+</html>

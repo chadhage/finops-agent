@@ -1,0 +1,17 @@
+{
+  "isExample": true,
+  "properties": {
+    "columns": [
+      {"name": "PreTaxCost", "type": "Number"},
+      {"name": "Currency", "type": "String"},
+      {"name": "ResourceId", "type": "String"},
+      {"name": "ResourceLocation", "type": "String"},
+      {"name": "UsageDate", "type": "Number"}
+    ],
+    "rows": [
+      [0.004, "USD", "/subscriptions/30000000-0000-0000-0000-000000000001/resourceGroups/app/providers/Microsoft.Compute/virtualMachines/vm1", "eastus", 20260901],
+      [0.004, "USD", "/subscriptions/30000000-0000-0000-0000-000000000001/resourceGroups/app/providers/Microsoft.Compute/virtualMachines/vm1", "eastus", 20260902]
+    ],
+    "nextLink": null
+  }
+}
