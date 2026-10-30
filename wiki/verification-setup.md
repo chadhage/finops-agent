@@ -92,6 +92,10 @@ and creates a new private directory under
 Input files are never overwritten. Invalid or incomplete inputs produce explicit
 errors, not an accepted setup. JSON previews are review-only. Changing the form
 requires generating a new setup.
+Preparation records the same source fingerprint as the campaign runner and
+Portal validator. A source change after review blocks starting that setup;
+generate and review a new one. A restarted server persists an interrupted state
+instead of leaving an untracked run marked running.
 
 **Run verification suite** invokes the existing runner using the current Python
 executable and an argument array, never a shell or worker-only flags:

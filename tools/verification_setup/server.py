@@ -10,7 +10,6 @@ import logging
 import os
 import re
 import secrets
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -138,7 +137,12 @@ class SetupApp:
 
     def copy_input(self, value: Any, destination: Path, base: Path | None = None) -> Path:
         source = self.evidence_file(value, base)
-        shutil.copyfile(source, destination)
+        raw = source.read_bytes()
+        text = raw.decode("utf-8-sig")
+        if text.strip():
+            finops.no_secrets(finops.parse_json(text))
+        with destination.open("xb") as stream:
+            stream.write(raw)
         return source
 
     def reference_index(self, payload: Json, plan: Json, directory: Path) -> Json:
@@ -210,7 +214,8 @@ class SetupApp:
         options = runner_options(payload.get("runner"))
         identifier = uuid.uuid4().hex
         record: Json = {"id": identifier, "mode": mode, "runner": options, "state": "prepared",
-                        "createdAt": finops.utc_now(), "exitCode": None, "error": None}
+                        "createdAt": finops.utc_now(), "exitCode": None, "error": None,
+                        "source": finops.source_fingerprint()}
         with tempfile.TemporaryDirectory(prefix=".preparing-", dir=self.output) as temporary:
             directory = Path(temporary)
             if mode == "evidence":
@@ -220,7 +225,7 @@ class SetupApp:
                 age = positive(payload.get("maxEvidenceAgeSeconds"), "Evidence-age limit")
                 require(plan["manifest"]["scopeReference"]["status"] == "exact-match",
                         "The plan needs an independent exact resource-set reference before Portal verification.")
-                shutil.copyfile(plan_path, directory / "approved-plan.json")
+                self.copy_input(str(plan_path), directory / "approved-plan.json")
                 self.copy_input(payload.get("actualPath"), directory / "actual.json")
                 actual = finops.read_json(directory / "actual.json")
                 portal_validation.no_secrets(actual)
@@ -257,11 +262,17 @@ class SetupApp:
 
     @staticmethod
     def saved_report(directory: Path) -> Json | None:
-        paths = list((directory / "reports").glob("*\\report.json"))
+        root = directory / "reports"
+        paths = [path for folder in root.iterdir() for path in folder.glob("report.json")] if root.is_dir() else []
         require(len(paths) <= 1, "Runner produced more than one campaign report.", 500)
         if not paths:
             return None
-        report = json.loads(paths[0].read_text(encoding="utf-8"))
+        try:
+            report = json.loads(paths[0].read_text(encoding="utf-8"), object_pairs_hook=finops._object)
+            finops.object_fields(report, {"verdict"}, "Campaign report")
+            finops.no_secrets(report)
+        except (finops.EvidenceError, ValueError) as exc:
+            raise SetupError("The saved campaign report has an invalid shape.", 500) from exc
         require(isinstance(report, dict) and isinstance(report.get("verdict"), str),
                 "The saved campaign report has an invalid shape.", 500)
         return report
@@ -284,12 +295,15 @@ class SetupApp:
             require(self.active_id is None, "Another test campaign is running. Wait for it to finish.", 409)
             record = self.read_record(identifier)
             require(record["state"] == "prepared", "This setup was already invoked; generate a new setup to rerun.", 409)
+            require(isinstance(record.get("source"), dict) and
+                    record["source"].get("sha256") == finops.source_fingerprint()["sha256"],
+                    "Source changed since preparation; generate and review a new setup.", 409)
             directory = self.run_directory(identifier)
             command = self.command(record)
             record.update({"state": "running", "startedAt": finops.utc_now(), "command": command})
             self.active_id = identifier
-            write_record(directory, record)
             try:
+                write_record(directory, record)
                 with (directory / "runner.log").open("xb") as log:
                     process = subprocess.Popen(command, cwd=self.workspace, stdout=log, stderr=subprocess.STDOUT,
                                                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}, shell=False)
@@ -326,8 +340,11 @@ class SetupApp:
                         (report.get("acceptanceValidated") is True and
                          report.get("portalParity", {}).get("status") == "CAPTURED_PORTAL_PARITY_PASS"),
                         "A passing evidence run needs the captured-Portal acceptance gate.", 500)
+                require(isinstance(report.get("source"), dict) and
+                        report["source"].get("sha256") == record["source"]["sha256"],
+                        "Runner source differs from the reviewed setup; no acceptance can be claimed.", 500)
                 record.update({"state": "completed", "verdict": report["verdict"]})
-            except (OSError, ValueError, SetupError) as exc:
+            except (OSError, ValueError, SetupError, finops.EvidenceError) as exc:
                 record.update({"state": "error", "error": str(exc)})
                 LOGGER.exception("Test runner outcome could not be verified")
             record.update({"exitCode": code, "completedAt": finops.utc_now()})
@@ -343,6 +360,8 @@ class SetupApp:
             if record["state"] == "running" and self.active_id != identifier:
                 record.update({"state": "interrupted", "error": "Server restarted before completion was recorded. "
                                "Inspect the saved reports and runner PID; this is not a completed verification."})
+                record["completedAt"] = finops.utc_now()
+                write_record(directory, record)
             report = self.saved_report(directory)
             log = ""
             log_path = directory / "runner.log"

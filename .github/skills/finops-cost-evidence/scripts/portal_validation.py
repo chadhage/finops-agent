@@ -17,19 +17,8 @@ import finops
 
 
 Json = dict[str, Any]
-SECRET_KEYS = {"authorization", "cookie", "set-cookie", "accesstoken", "refreshtoken",
-               "idtoken", "clientsecret", "client_secret"}
-
-
 def no_secrets(value: Any) -> None:
-    if isinstance(value, dict):
-        finops.require(not SECRET_KEYS & {str(k).lower().replace("_", "") for k in value},
-                       "Credential/header fields are not permitted in Portal evidence.")
-        for item in value.values():
-            no_secrets(item)
-    elif isinstance(value, list):
-        for item in value:
-            no_secrets(item)
+    finops.no_secrets(value)
 
 
 def real_document(value: Json, label: str) -> None:
@@ -207,7 +196,8 @@ def run_validation(config_path: Path, mode: str, output_dir: Path,
                    confirm_live_plan: str | None = None) -> Json:
     finops.require(not output_dir.exists(), "Use a new Portal validation output directory.")
     report: Json = {"schemaVersion": 1, "status": "RUNNING", "mode": mode, "startedAt": finops.utc_now(),
-                    "liveQueryAttempted": False, "liveQueryExecuted": False, "identityVerifiedThisRun": False}
+                    "liveQueryAttempted": False, "liveQueryExecuted": False, "identityVerifiedThisRun": False,
+                    "source": finops.source_fingerprint()}
     save_report(output_dir, report)
     try:
         inputs = load_inputs(config_path, mode, confirm_live_plan)
@@ -231,14 +221,21 @@ def run_validation(config_path: Path, mode: str, output_dir: Path,
         no_secrets(actual)
         finops.write_json(output_dir / "actual.json", actual)
         report["comparison"] = compare_amounts(actual, inputs)
+        finops.require(finops.source_fingerprint()["sha256"] == report["source"]["sha256"],
+                       "Source changed during Portal validation; acceptance is invalid.")
         if report["comparison"]["status"] != "match":
             report["status"] = "MISMATCH"
         else:
             report["status"] = "LIVE_PORTAL_PARITY_PASS" if mode == "live" else "CAPTURED_PORTAL_PARITY_PASS"
-        report["completedAt"] = finops.utc_now()
     except (finops.EvidenceError, OSError, KeyError, TypeError, ValueError) as exc:
         report["status"], report["error"] = "BLOCKED", str(exc)
+    except KeyboardInterrupt:
+        report["status"], report["error"] = "INTERRUPTED", "Portal validation interrupted; acceptance is incomplete."
+        raise
     finally:
+        if report["status"] == "RUNNING":
+            report["status"], report["error"] = "ERROR", "Portal validation ended without a completed outcome."
+        report["completedAt"] = finops.utc_now()
         save_report(output_dir, report)
     return report
 
@@ -253,6 +250,9 @@ def main(argv: list[str] | None = None) -> int:
     directory = args.out_dir / (datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:8])
     try:
         report = run_validation(args.config, args.mode, directory, args.confirm_live_plan)
+    except KeyboardInterrupt:
+        print("Portal validation interrupted; no acceptance claimed.", file=sys.stderr)
+        return 130
     except (finops.EvidenceError, OSError) as exc:
         print(f"Portal validation blocked: {exc}", file=sys.stderr)
         return 2

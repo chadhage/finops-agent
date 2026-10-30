@@ -706,7 +706,7 @@ class CustomizationTests(unittest.TestCase):
         workspace = Path(__file__).resolve().parents[4]
         agent = workspace / ".github" / "agents" / "FinOpsAgent.agent.md"
         skills = workspace / ".github" / "skills"
-        skill_paths = sorted(skills.glob("*\\SKILL.md"))
+        skill_paths = sorted(skills.rglob("SKILL.md"))
         self.assertEqual({path.parent.name for path in skill_paths}, {
             "azure-cost-management", "finops-invoker-access", "finops-scope-resolution",
             "finops-cost-evidence", "finops-reporting",

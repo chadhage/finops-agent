@@ -181,9 +181,13 @@ class NegativeLedgerShapeTests(matrix.CliCase):
         self.assert_blocked("report", {"actual": fixture.reseal(capture)})
 
     def test_scope_validation_flag_without_provenance_cannot_validate_report(self):
-        manifest = fixture.plan_for()["manifest"]
+        plan = fixture.plan_for()
+        manifest = plan["manifest"]
         manifest["scopeReference"] = {"status": "exact-match"}
-        plan = finops.make_plan(fixture.reseal(manifest))
+        manifest = fixture.reseal(manifest)
+        with self.assertRaises(finops.EvidenceError):
+            finops.make_plan(manifest)
+        plan = fixture.reseal({**plan, "manifest": manifest})
         actual, reference = fixture.bundle_for(plan), fixture.bundle_for(plan)
         self.assert_blocked("report", {"actual": actual, "reference": reference})
 

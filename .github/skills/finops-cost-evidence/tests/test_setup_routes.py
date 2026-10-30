@@ -117,7 +117,7 @@ class NegativeSetupRouteTests(RouteCase):
     def test_malformed_campaign_report_is_not_a_passing_outcome(self):
         record = self.offline()
         self.write_report(record["id"])
-        target = next((self.app.run_directory(record["id"]) / "reports").glob("*\\report.json"))
+        target = next((self.app.run_directory(record["id"]) / "reports").rglob("report.json"))
         target.write_text("[]", encoding="utf-8")
         with self.assertRaisesRegex(setup.SetupError, "invalid shape"):
             self.app.status(record["id"])

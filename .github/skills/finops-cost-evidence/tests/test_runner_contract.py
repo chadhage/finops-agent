@@ -152,7 +152,7 @@ class PositiveRunnerTests(RunnerCase):
     def test_fingerprint_includes_every_discoverable_skill(self):
         snapshot = run_tests.fingerprint()
         skills = run_tests.WORKSPACE / ".github" / "skills"
-        for path in skills.glob("*\\SKILL.md"):
+        for path in skills.rglob("SKILL.md"):
             with self.subTest(path=path):
                 self.assertIn(str(path.relative_to(run_tests.WORKSPACE)), snapshot["files"])
 

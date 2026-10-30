@@ -42,6 +42,10 @@ incomplete permissions, alternative cost-response schemas, and invoice finality.
 | Report | `report` | A single evidence model serialized as Markdown/HTML/PDF. |
 
 Output paths must not exist; the helper never overwrites a user's artifact.
+Completed helper/PDF artifacts are published create-only using a same-filesystem
+hard link, so a failed write cannot leave a partial report under the final name.
+Use a local filesystem supporting hard links (for example NTFS or ext4);
+unsupported publication is an explicit I/O failure, not a non-atomic fallback.
 Use a new per-run directory under an approved local evidence location.
 The repository ignores `.finops-runs` and Python caches. Do not commit workload
 evidence, directory personal data, tokens, invoices, or customer reports.
@@ -50,6 +54,21 @@ Hashes detect changes, not authenticity or factual completeness. Coverage flags
 mean the source was evaluated over the declared caller-visible boundary; they
 cannot prove unknown invisible resources do not exist. Source attestations and
 independent references must not be manufactured by the model.
+
+An exact-match manifest embeds the complete independent resource reference under
+`scopeReference.reference`. Plan verification recomputes its scenario binding,
+resource-set equality, hash, source and capture-time metadata. A status flag or
+hash alone cannot establish reference parity. Older exact-match manifests without
+that embedded reference are intentionally blocked: re-run `resolve` with the
+original independent resource reference, review the new manifest and plan, and
+explicitly approve the new plan hash. Do not copy a status flag into old artifacts.
+Unverified manifests remain unverified; this is not an authenticity signature.
+
+Shared credential checks reject known credential/header field names in evidence
+objects and embedded raw response-page JSON before capture/import/snapshot or
+artifact publication. Raw numeric lexemes are inspected, not reserialized.
+This is a defense-in-depth field check, not a universal secret detector: operators
+must still sanitize exports and never supply tokens or unsanitized HAR files.
 
 ## Filter contract
 

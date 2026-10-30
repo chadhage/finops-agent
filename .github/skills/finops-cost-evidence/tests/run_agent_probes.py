@@ -66,7 +66,7 @@ def main(argv: list[str] | None = None) -> int:
         save(output, report)
         return 2
     matrix = json.loads(MATRIX.read_text(encoding="utf-8"))
-    skills = sorted((ROOT / ".github" / "skills").glob("*\\SKILL.md"))
+    skills = sorted((ROOT / ".github" / "skills").rglob("SKILL.md"))
     references = "\n\n".join(f"REFERENCE SKILL {path.parent.name}\n{path.read_text(encoding='utf-8')}" for path in skills)
     phases = ("negative",) if args.negative_only else ("negative", "positive")
     try:

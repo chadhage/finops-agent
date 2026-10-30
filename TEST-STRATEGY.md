@@ -2,6 +2,28 @@
 
 ## Objective and acceptance rules
 
+### Promise-to-evidence acceptance matrix
+
+Each layer is a separate gate. A passing result in one layer cannot satisfy
+another, and historical results with a different source fingerprint are not
+current-build qualification. Missing evidence is NOT RUN or BLOCKED, never PASS.
+
+| Promise / layer | Enforcement point | Executable evidence | Acceptance gate and limit |
+|---|---|---|---|
+| Invoker, exact scope, complete pages, exact money (helper) | Shared helper schema, identity, plan, capture and reconciliation validators | Classified offline catalog, including malformed inputs and guard-removal controls | Ten complete shuffled repetitions; zero failures/errors/skips; no live/model claim |
+| Credential-free evidence (helper/setup) | Shared credential guard before import, capture, snapshot and persistence | Nested/raw response markers and denied-output tests | No marker in newly persisted evidence, reports or diagnostics; rejection does not sanitize inputs into acceptance |
+| Independently referenced scope and costs (helper) | Recomputed resource-set comparison and per-row cost reconciliation | Provenance/tampering negatives and valid independent references | Exact resource set and every monetary key; hashes establish integrity, not authenticity |
+| Captured Portal parity (evidence) | Portal validator plus mode/exit/identity result contract | Genuine operator-attested request/response pages and display totals | Exact matching approved plan and freshness; no fresh authentication/query claim |
+| Fresh Portal parity (live) | Invoker authentication, exact-plan approval and fresh read-only query | Independently captured Portal evidence plus current query and identity proof | Both cost bases where supported; no extrapolation to untested offers or final invoices |
+| Private local output and setup (integration) | Real CLI, browser, setup routes and artifact lifecycle | Current-fingerprint CLI/UI/PDF integration report | Same exact amounts/status across formats; failures, interruption, download and reopen tested |
+| Approval ordering and model compliance (agent) | Actual agent, normal skill loading and bounded synthetic tools | Full conversation/tool traces and golden artifacts for every scenario, at least three repetitions | Zero forbidden attempted actions; restricted tools-disabled probes do not satisfy this layer |
+| Usable operator handoff (pilot) | Supervised clean-setup run and human release review | Operator-reviewed evidence package with the same source fingerprint | Explicit reviewed release decision; live/model/pilot gaps keep acceptance blocked |
+
+CI checks are regression evidence only. Branch protection must be configured by
+a repository administrator; adding a workflow does not itself make checks required.
+Live acceptance and the pilot require separately supplied approvals and genuine
+evidence. The test tools do not infer authorization from a request to change code.
+
 Find false success, wrong identity/scope, missing resource membership, incorrect
 money, unsupported validation claims, and unreliable output BEFORE accepting the
 agent. A passing helper suite is not proof that the model follows instructions

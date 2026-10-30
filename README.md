@@ -197,6 +197,10 @@ For HTML, add `--format html` and use an HTML output path. For PDF, add
 file, not an automatically published website.
 
 Outputs are create-only: use a new per-run directory or distinct file names.
+Final artifacts require a local filesystem supporting hard links (such as NTFS
+or ext4) for complete, atomic create-only publication. Rebuild older exact-match
+manifests/plans with their original independent resource reference before using
+the strengthened provenance gate; review and approve the new plan hash.
 The [evidence contract](.github/skills/finops-cost-evidence/references/evidence-contract.md)
 defines supported schemas, reference import and reproducibility limits.
 
@@ -249,6 +253,12 @@ python -B $runner --offline-only --repeat 10 --seed 1729
 ```
 
 That mode explicitly reports **PORTAL PARITY NOT VALIDATED**.
+The [core regression workflow](.github/workflows/verification.yml) runs ten
+negative-first repetitions on Windows/Linux with Python 3.11 and the latest
+stable Python, retains synthetic diagnostics, and runs real local CLI controls.
+It is credential-free and does not qualify browser PDF, model conversations, or
+live Azure parity. Remote CI must actually execute; adding the workflow is not
+a passing run or branch-protection configuration.
 Add `--coverage` to retain executable-line coverage and uncovered line numbers
 for the Python helper, Portal validator, runner, and setup server; this is not
 branch coverage or proof of model compliance.

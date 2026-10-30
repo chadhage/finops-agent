@@ -34,7 +34,7 @@ class CliCase(unittest.TestCase):
             arguments = [command]
             for flag, value in documents.items():
                 source = root / (flag + ".json")
-                finops.write_json(source, value)
+                source.write_text(json.dumps(value), encoding="utf-8")
                 arguments += ["--" + flag, str(source)]
             output = root / "must-not-exist.json"
             arguments += [*(extra or []), "--out", str(output)]

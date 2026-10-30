@@ -32,6 +32,8 @@ CONTAINER_QUERY = (
     "ResourceContainers | project id, name, type, subscriptionId, properties | order by id asc"
 )
 Json = dict[str, Any]
+SECRET_KEYS = {"authorization", "cookie", "setcookie", "accesstoken", "refreshtoken",
+               "idtoken", "clientsecret"}
 
 
 class EvidenceError(Exception):
@@ -41,6 +43,37 @@ class EvidenceError(Exception):
 def require(condition: bool, message: str) -> None:
     if not condition:
         raise EvidenceError(message)
+
+
+def object_fields(value: Any, required: set[str], label: str) -> Json:
+    require(isinstance(value, dict), f"{label} must be an object.")
+    require(required <= value.keys(), f"{label} is missing required fields.")
+    return value
+
+
+def object_rows(value: Any, label: str) -> list[Json]:
+    require(isinstance(value, list) and all(isinstance(item, dict) for item in value),
+            f"{label} must be an array of objects.")
+    return value
+
+
+def nonempty_text(value: Any, label: str) -> str:
+    require(isinstance(value, str) and bool(value.strip()), f"{label} must be a nonempty string.")
+    return value
+
+
+def no_secrets(value: Any) -> None:
+    if isinstance(value, dict):
+        require(not SECRET_KEYS & {re.sub(r"[-_]", "", str(key)).casefold() for key in value},
+                "Credential/header fields are not permitted in evidence.")
+        for key, item in value.items():
+            if key == "raw" and {"url", "status"} <= value.keys() and isinstance(item, str) and item.strip():
+                no_secrets(parse_json(item))
+            else:
+                no_secrets(item)
+    elif isinstance(value, list):
+        for item in value:
+            no_secrets(item)
 
 
 def utc_now() -> str:
@@ -140,7 +173,9 @@ def parse_json(raw: str) -> Json:
 
 
 def read_json(path: Path) -> Json:
-    return parse_json(path.read_text(encoding="utf-8-sig"))
+    value = parse_json(path.read_text(encoding="utf-8-sig"))
+    no_secrets(value)
+    return value
 
 
 def canonical(value: Any) -> str:
@@ -155,22 +190,50 @@ def raw_digest(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
+def source_fingerprint() -> Json:
+    root = Path(__file__).resolve().parents[4]
+    pack = Path(__file__).resolve().parents[1]
+    paths = [root / "README.md", root / "TEST-STRATEGY.md",
+             root / ".github" / "agents" / "FinOpsAgent.agent.md", root / "tools" / "validate_microsite.py"]
+    for skill in (root / ".github" / "skills").iterdir():
+        paths.extend(skill.glob("SKILL.md"))
+        paths.extend((skill / "references").glob("*.md"))
+    for folder, pattern in ((pack / "scripts", "*.py"), (pack / "tests", "*.py"),
+                            (pack / "tests", "*.json"), (pack / "assets", "*.json"),
+                            (root / ".github" / "workflows", "*.yml"),
+                            (root / "tools" / "verification_setup", "*.py"),
+                            (root / "tools" / "verification_setup" / "static", "*")):
+        paths.extend(folder.glob(pattern))
+    hashes = {str(path.relative_to(root)): hashlib.sha256(path.read_bytes()).hexdigest()
+              for path in sorted(set(paths)) if path.is_file()}
+    return {"sha256": hashlib.sha256(json.dumps(hashes, sort_keys=True).encode()).hexdigest(), "files": hashes}
+
+
 def sealed(value: Json) -> Json:
     return {**value, "sha256": digest(value)}
 
 
 def verify_seal(value: Json) -> None:
+    object_fields(value, {"sha256"}, "Sealed evidence")
+    no_secrets(value)
     require(value.get("sha256") == digest({k: v for k, v in value.items() if k != "sha256"}),
             "Evidence hash mismatch.")
 
 
-def write_text(path: Path, text: str) -> None:
+def publish_bytes(path: Path, data: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("x", encoding="utf-8", newline="\n") as stream:
-        stream.write(text)
+    with tempfile.TemporaryDirectory(prefix=".finops-writing-", dir=path.parent) as directory:
+        temporary = Path(directory) / "complete"
+        temporary.write_bytes(data)
+        path.hardlink_to(temporary)
+
+
+def write_text(path: Path, text: str) -> None:
+    publish_bytes(path, text.encode("utf-8"))
 
 
 def write_json(path: Path, value: Json) -> None:
+    no_secrets(value)
     write_text(path, json.dumps(value, indent=2, ensure_ascii=True, allow_nan=False) + "\n")
 
 
@@ -194,6 +257,8 @@ def usd_display(amount: Decimal) -> str:
 def validate_scenario(scenario: Json) -> None:
     allowed = {"schemaVersion", "tenantId", "principalId", "approvedSubscriptionIds",
                "period", "costBasis", "selection"}
+    object_fields(scenario, allowed, "Scenario")
+    no_secrets(scenario)
     require(not set(scenario) - allowed, "Unknown scenario fields; do not silently ignore filters.")
     require(type(scenario.get("schemaVersion")) is int and scenario["schemaVersion"] == 1,
             "Unsupported scenario schema.")
@@ -254,6 +319,31 @@ def scope_contains(scope: str, resource: str, ancestors: list[Json]) -> bool:
 
 def resolve_scope(scenario: Json, catalog: Json, reference: Json | None = None) -> Json:
     validate_scenario(scenario)
+    object_fields(catalog, {"schemaVersion", "tenantId", "principalId", "collectedAt", "coverage",
+                           "subscriptions", "resourceGroups", "resources", "locations", "users",
+                           "ownerBindings"}, "Catalog")
+    no_secrets(catalog)
+    for field in ("subscriptions", "resourceGroups", "resources", "locations", "users", "ownerBindings"):
+        object_rows(catalog[field], f"Catalog {field}")
+    for subscription in catalog["subscriptions"]:
+        object_fields(subscription, {"id", "name", "managementGroups"}, "Catalog subscription")
+        nonempty_text(subscription["name"], "Subscription name")
+        for group in object_rows(subscription["managementGroups"], "Management groups"):
+            object_fields(group, {"id", "name"}, "Management group")
+            arm_id(group["id"])
+            nonempty_text(group["name"], "Management group name")
+    for group in catalog["resourceGroups"]:
+        object_fields(group, {"id", "name"}, "Resource group")
+        nonempty_text(group["name"], "Resource group name")
+        require(subscription_of(group["id"]) in scenario["approvedSubscriptionIds"],
+                "Resource group inventory escaped the approved subscription boundary.")
+    for location in catalog["locations"]:
+        object_fields(location, {"name", "displayName"}, "Location")
+        nonempty_text(location["name"], "Location name")
+        nonempty_text(location["displayName"], "Location display name")
+    for user in catalog["users"]:
+        object_fields(user, {"id"}, "Directory user")
+        guid(user["id"])
     tenant, principal = guid(scenario["tenantId"]), guid(scenario["principalId"])
     approved = {guid(v) for v in scenario["approvedSubscriptionIds"]}
     require(type(catalog.get("schemaVersion")) is int and catalog["schemaVersion"] == 1,
@@ -299,6 +389,7 @@ def resolve_scope(scenario: Json, catalog: Json, reference: Json | None = None) 
     resources = []
     seen = set()
     for resource in catalog["resources"]:
+        object_fields(resource, {"id", "location", "tags"}, "Inventory resource")
         identifier = resource_id(resource["id"])
         sid = subscription_of(identifier)
         require(sid in approved, "Resource inventory escaped the approved subscription boundary.")
@@ -391,14 +482,7 @@ def resolve_scope(scenario: Json, catalog: Json, reference: Json | None = None) 
     resource_ids = sorted(matched)
     scope_reference: Json = {"status": "not-verified"}
     if reference is not None:
-        require(reference["scenarioSha256"] == digest(scenario), "Resource reference scenario mismatch.")
-        require(bool(reference.get("source")), "Resource reference source is required.")
-        require(timestamp(reference["capturedAt"]) <= timestamp(utc_now()),
-                "Resource reference capture time is in the future.")
-        expected = unique([arm_id(v) for v in reference["resourceIds"]], "reference resource IDs")
-        require(expected == resource_ids, "Resource reference mismatch: exact resource sets differ.")
-        scope_reference = {"status": "exact-match", "sha256": digest(reference),
-                           "source": reference["source"], "capturedAt": reference["capturedAt"]}
+        scope_reference = resource_reference(reference, digest(scenario), resource_ids)
     return sealed({
         "schemaVersion": 1, "tenantId": tenant, "principalId": principal,
         "approvedSubscriptionIds": sorted(approved), "subscriptionIds": sorted(selected),
@@ -411,8 +495,26 @@ def resolve_scope(scenario: Json, catalog: Json, reference: Json | None = None) 
     })
 
 
+def resource_reference(reference: Json, scenario_sha256: str, resource_ids: list[str]) -> Json:
+    object_fields(reference, {"scenarioSha256", "source", "capturedAt", "resourceIds"}, "Resource reference")
+    no_secrets(reference)
+    require(reference["scenarioSha256"] == scenario_sha256, "Resource reference scenario mismatch.")
+    nonempty_text(reference["source"], "Resource reference source")
+    require(timestamp(reference["capturedAt"]) <= timestamp(utc_now()),
+            "Resource reference capture time is in the future.")
+    require(isinstance(reference["resourceIds"], list), "Reference resource IDs must be an array.")
+    expected = unique([resource_id(value) for value in reference["resourceIds"]], "reference resource IDs")
+    require(expected == resource_ids, "Resource reference mismatch: exact resource sets differ.")
+    return {"status": "exact-match", "sha256": digest(reference), "source": reference["source"],
+            "capturedAt": reference["capturedAt"], "reference": reference}
+
+
 def make_plan(manifest: Json) -> Json:
     verify_seal(manifest)
+    object_fields(manifest, {"schemaVersion", "scenario", "scenarioSha256", "tenantId", "principalId",
+                            "period", "costBasis", "approvedSubscriptionIds", "subscriptionIds",
+                            "excludedSubscriptionIds", "resourceIds", "scopeMode", "scopeReference",
+                            "inventoryAsOf", "catalogSha256", "ownerEvidence"}, "Manifest")
     require(type(manifest.get("schemaVersion")) is int and manifest["schemaVersion"] == 1,
             "Unsupported manifest schema.")
     validate_scenario(manifest["scenario"])
@@ -423,13 +525,26 @@ def make_plan(manifest: Json) -> Json:
     require(manifest["period"] == scenario["period"] and manifest["costBasis"] == scenario["costBasis"],
             "Manifest reporting parameters differ from the approved scenario.")
     approved = {guid(v) for v in scenario["approvedSubscriptionIds"]}
-    selected = unique([guid(v) for v in manifest["subscriptionIds"]], "selected subscriptions")
+    selected = unique([guid(v) for v in nonempty_strings(manifest["subscriptionIds"], "selected subscriptions")],
+                      "selected subscriptions")
     require(bool(selected) and set(selected) <= approved, "Plan escaped the approved subscriptions.")
     require(manifest["approvedSubscriptionIds"] == sorted(approved) and
             manifest["excludedSubscriptionIds"] == sorted(approved - set(selected)),
             "Manifest included/excluded subscription metadata is inconsistent.")
+    require(isinstance(manifest["resourceIds"], list), "Manifest resources must be an array.")
     resources = unique([resource_id(v) for v in manifest["resourceIds"]], "selected resources")
     require(all(subscription_of(r) in selected for r in resources), "A resource escaped the selected scope.")
+    require(timestamp(manifest["inventoryAsOf"]) <= timestamp(utc_now()), "Inventory time is in the future.")
+    require(isinstance(manifest["catalogSha256"], str) and
+            re.fullmatch(r"[a-f0-9]{64}", manifest["catalogSha256"]) is not None, "Invalid catalog hash.")
+    object_rows(manifest["ownerEvidence"], "Manifest ownership evidence")
+    scope_reference = object_fields(manifest["scopeReference"], {"status"}, "Scope reference")
+    if scope_reference["status"] == "exact-match":
+        object_fields(scope_reference, {"reference"}, "Exact resource reference provenance")
+        require(scope_reference == resource_reference(scope_reference["reference"], digest(scenario), resources),
+                "Resource reference provenance is inconsistent.")
+    else:
+        require(scope_reference == {"status": "not-verified"}, "Invalid resource reference status.")
     mode = manifest["scopeMode"]
     require(mode in ("subscription-charges", "current-resource-set"), "Unsupported scope mode.")
     resource_filter = bool(set(scenario["selection"]) & {
@@ -462,6 +577,8 @@ def make_plan(manifest: Json) -> Json:
 
 def verify_plan(plan: Json) -> None:
     verify_seal(plan)
+    object_fields(plan, {"schemaVersion", "manifest", "requests"}, "Plan")
+    object_rows(plan["requests"], "Plan requests")
     require(type(plan.get("schemaVersion")) is int and plan["schemaVersion"] == 1, "Unsupported plan schema.")
     require(plan == make_plan(plan["manifest"]), "The plan contains non-generated or modified operations.")
 
@@ -498,6 +615,8 @@ def cli_json(arguments: list[str]) -> Json:
 def azure_identity(tenant: str, subscription: str, principal: str | None = None) -> tuple[Json, str]:
     tenant, subscription = guid(tenant), guid(subscription)
     profile = cli_json(["account", "show", "--subscription", subscription])
+    object_fields(profile, {"id", "tenantId", "environmentName", "state", "user", "name"}, "Azure CLI profile")
+    nonempty_text(profile["name"], "Subscription name")
     require(guid(profile["id"]) == subscription and guid(profile["tenantId"]) == tenant,
             "Azure CLI subscription/tenant differs from the confirmed selection.")
     require(profile.get("environmentName") == "AzureCloud", "This helper currently supports AzureCloud only.")
@@ -507,6 +626,7 @@ def azure_identity(tenant: str, subscription: str, principal: str | None = None)
             user["type"].casefold() == "user",
             "An interactive invoker identity is required; application/developer identity substitution is forbidden.")
     result = cli_json(["account", "get-access-token", "--subscription", subscription, "--resource", ARM + "/"])
+    object_fields(result, {"accessToken"}, "Azure CLI token response")
     token = result["accessToken"]
     require(isinstance(token, str) and len(token.split(".")) == 3, "Azure CLI returned a non-JWT ARM token.")
     try:
@@ -514,12 +634,15 @@ def azure_identity(tenant: str, subscription: str, principal: str | None = None)
         claims = parse_json(base64.urlsafe_b64decode(encoded + "=" * (-len(encoded) % 4)).decode("utf-8"))
     except (ValueError, UnicodeDecodeError) as exc:
         raise EvidenceError("Cannot inspect the Azure CLI token identity.") from exc
+    object_fields(claims, {"oid", "tid", "exp", "aud"}, "ARM token claims")
     oid = guid(claims["oid"])
     require(guid(claims["tid"]) == tenant and (principal is None or oid == guid(principal)),
             "Token identity differs from the confirmed invoker.")
-    require(claims.get("idtyp") != "app" and claims.get("exp", 0) > time.time() + 60,
+    require(claims.get("idtyp") != "app" and type(claims.get("exp")) is int and
+            claims["exp"] > time.time() + 60,
             "The invoker token is application-only or expired.")
-    require(claims.get("aud", "").rstrip("/") in (ARM, "https://management.core.windows.net"),
+    audience = claims.get("aud")
+    require(isinstance(audience, str) and audience.rstrip("/") in (ARM, "https://management.core.windows.net"),
             "Unexpected ARM token audience.")
     return {"tenantId": tenant, "principalId": oid, "subscriptionId": subscription,
             "subscriptionName": profile["name"], "verifiedAt": utc_now(),
@@ -559,6 +682,8 @@ class AzureClient:
             try:
                 with self.opener.open(request, timeout=120) as response:
                     raw = response.read().decode("utf-8-sig")
+                    if raw.strip():
+                        no_secrets(parse_json(raw))
                     return {"url": url, "status": response.status, "raw": raw,
                             "sha256": raw_digest(raw), "retrievedAt": utc_now(),
                             "azureRequestId": response.headers.get("x-ms-request-id", "")}
@@ -686,6 +811,12 @@ def collect_inventory(scenario: Json, client: AzureClient, owners: Json | None =
 
 
 def page_next(page: Json) -> str | None:
+    object_fields(page, {"sha256", "raw", "status", "url", "retrievedAt", "azureRequestId"}, "Response page")
+    require(isinstance(page["raw"], str) and type(page["status"]) is int,
+            "Response raw/status types are invalid.")
+    nonempty_text(page["url"], "Response URL")
+    require(isinstance(page["azureRequestId"], str), "Response request ID must be a string.")
+    no_secrets(page)
     require(page.get("sha256") == raw_digest(page["raw"]), "Raw response hash mismatch.")
     timestamp(page["retrievedAt"])
     if page["status"] == 204:
@@ -724,6 +855,9 @@ def execute_plan(plan: Json, client: AzureClient) -> Json:
 
 def validate_bundle(bundle: Json) -> Json:
     verify_seal(bundle)
+    object_fields(bundle, {"schemaVersion", "captureId", "capturedAt", "source", "plan", "captures"},
+                  "Cost capture")
+    nonempty_text(bundle["source"], "Capture source")
     require(type(bundle.get("schemaVersion")) is int and bundle["schemaVersion"] == 1,
             "Unsupported cost evidence schema.")
     guid(bundle["captureId"])
@@ -731,7 +865,11 @@ def validate_bundle(bundle: Json) -> Json:
     require(captured_at <= timestamp(utc_now()), "Cost capture time is in the future.")
     plan = bundle["plan"]
     verify_plan(plan)
-    captures = bundle["captures"]
+    captures = object_rows(bundle["captures"], "Captured requests")
+    for capture in captures:
+        object_fields(capture, {"requestId", "pages"}, "Captured request")
+        nonempty_text(capture["requestId"], "Captured request ID")
+        object_rows(capture["pages"], "Captured pages")
     unique([c["requestId"] for c in captures], "captured requests")
     require({c["requestId"] for c in captures} == {r["id"] for r in plan["requests"]},
             "A query response is missing or unexpected.")
@@ -765,7 +903,11 @@ def validate_bundle(bundle: Json) -> Json:
                 continue
             properties = parse_json(page["raw"])["properties"]
             columns = properties["columns"]
-            require(isinstance(columns, list), "Missing cost columns.")
+            object_rows(columns, "Cost columns")
+            for column in columns:
+                object_fields(column, {"name", "type"}, "Cost column")
+                nonempty_text(column["name"], "Cost column name")
+                nonempty_text(column["type"], "Cost column type")
             names = [c["name"] for c in columns]
             unique(names, "cost column names")
             types = {c["name"]: c["type"] for c in columns}
@@ -798,6 +940,7 @@ def validate_bundle(bundle: Json) -> Json:
                     require(chunk is None or resource in chunk, "A cost row escaped its exact resource filter.")
                     location = row["ResourceLocation"]
                     require(location is None or isinstance(location, str), "Invalid billed location.")
+                    require(type(row["UsageDate"]) is int, "Usage date must be an exact JSON integer.")
                     day = str(row["UsageDate"])
                     require(re.fullmatch(r"\d{8}", day) is not None, "Invalid usage date.")
                     try:
@@ -842,17 +985,27 @@ def reconcile(actual: Json, reference: Json) -> Json:
 
 def import_reference(plan: Json, index: Json, directory: Path) -> Json:
     verify_plan(plan)
+    object_fields(index, {"source", "tenantId", "principalId", "capturedAt", "captures"}, "Reference index")
+    no_secrets(index)
+    nonempty_text(index["source"], "Reference source")
+    object_rows(index["captures"], "Reference captures")
     require(index["source"] in ("manual-azure-cli", "portal-query-export"), "Unknown manual reference source.")
     require(index["tenantId"] == plan["manifest"]["tenantId"] and
             index["principalId"] == plan["manifest"]["principalId"], "Manual reference identity mismatch.")
     timestamp(index["capturedAt"])
     captures = []
     for capture in index["captures"]:
+        object_fields(capture, {"requestId", "pages"}, "Reference capture")
+        object_rows(capture["pages"], "Reference pages")
         pages = []
         for entry in capture["pages"]:
+            object_fields(entry, {"path", "url", "status"}, "Reference page")
+            nonempty_text(entry["path"], "Reference page path")
             path = directory / entry["path"]
             require(not str(path).startswith("\\\\"), "Network-share reference files are not supported.")
             raw = path.read_text(encoding="utf-8-sig")
+            if raw.strip():
+                no_secrets(parse_json(raw))
             pages.append({"url": entry["url"], "status": entry["status"], "raw": raw,
                           "sha256": raw_digest(raw), "retrievedAt": index["capturedAt"], "azureRequestId": ""})
         captures.append({"requestId": capture["requestId"], "pages": pages})
@@ -1027,8 +1180,7 @@ def export_pdf(document: str, output: Path, browser: Path) -> None:
         require(result.returncode == 0 and valid_pdf,
                 f"Browser PDF export failed (exit {result.returncode}; valid PDF: {valid_pdf}). "
                 "Choose a working Edge, Chrome, or Chromium headless-shell runtime; no PDF was accepted.")
-        with output.open("xb") as stream:
-            stream.write(target.read_bytes())
+        publish_bytes(output, target.read_bytes())
 
 
 def main(argv: list[str] | None = None) -> int:

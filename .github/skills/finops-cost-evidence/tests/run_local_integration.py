@@ -93,7 +93,7 @@ def main(argv: list[str] | None = None) -> int:
             run(identifier, "negative", script, arguments, expected)
         assert existing.read_text(encoding="utf-8") == "DO NOT CHANGE"
         for root in ("sample-evidence", "sample-live"):
-            result = json.loads(next((directory / root).glob("*\\report.json")).read_text(encoding="utf-8"))
+            result = json.loads(next((directory / root).rglob("report.json")).read_text(encoding="utf-8"))
             assert result["status"] == "BLOCKED" and not result["liveQueryAttempted"]
         report["negativeComplete"] = True
         save(directory, report)
@@ -152,11 +152,19 @@ def main(argv: list[str] | None = None) -> int:
         if fingerprint()["sha256"] != report["source"]["sha256"]:
             report.update(status="NOT COMPARABLE", error="Source changed during local integration.")
         save(directory, report)
-        return 0
+        return 0 if report["status"].startswith("PASS") else 1
+    except KeyboardInterrupt:
+        report.update(status="INTERRUPTED", error="Local integration interrupted; no acceptance claimed.")
+        save(directory, report)
+        return 130
     except (AssertionError, OSError, ValueError, subprocess.SubprocessError) as exc:
         report.update(status="FAIL", error=str(exc))
         save(directory, report)
         return 1
+    finally:
+        if report["status"] == "RUNNING":
+            report.update(status="ERROR", error="Local integration ended without a completed outcome.")
+            save(directory, report)
 
 
 if __name__ == "__main__":

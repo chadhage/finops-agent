@@ -19,7 +19,7 @@ class PositiveSkillContractTests(unittest.TestCase):
     phase = "positive"
 
     def test_exact_five_skills_are_discoverable_with_portable_metadata(self):
-        found = {path.parent.name for path in SKILLS.glob("*\\SKILL.md")}
+        found = {path.parent.name for path in SKILLS.rglob("SKILL.md")}
         self.assertEqual(found, EXPECTED)
         for name in sorted(EXPECTED):
             with self.subTest(skill=name):

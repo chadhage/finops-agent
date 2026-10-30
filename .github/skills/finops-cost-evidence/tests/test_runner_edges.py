@@ -19,7 +19,7 @@ class PortalStageCase(unittest.TestCase):
             portal_root = root / "portal-parity" / "test-run"
             portal_root.mkdir(parents=True)
             report = {"status": status, "mode": mode, "liveQueryExecuted": mode == "live",
-                      "identityVerifiedThisRun": mode == "live", **changes}
+                      "identityVerifiedThisRun": mode == "live", "source": run_tests.fingerprint(), **changes}
             (portal_root / "report.json").write_text(json.dumps(report), encoding="utf-8")
             with patch.object(run_tests.subprocess, "run", return_value=Mock(returncode=exit_code)):
                 return run_tests.run_portal_stage(root / "config.json", mode, None, root)
@@ -119,6 +119,6 @@ class PositiveRunnerEdgeTests(PortalStageCase):
                        side_effect=ValueError("synthetic-discovery-error")):
                 result = run_tests.main(["--repeat", "1", "--out-dir", str(root), "--offline-only"])
             self.assertEqual(result, 2)
-            report = json.loads(next(root.glob("*\\report.json")).read_text(encoding="utf-8"))
+            report = json.loads(next(root.rglob("report.json")).read_text(encoding="utf-8"))
             self.assertFalse(report["acceptanceValidated"])
             self.assertEqual(report["verdict"], "RUNNER ERROR")

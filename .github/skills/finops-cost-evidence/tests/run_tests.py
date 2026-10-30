@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import contextlib
-import hashlib
 import io
 import json
 import os
@@ -29,6 +28,8 @@ from line_coverage import LineCoverage, merge as merge_coverage
 
 TESTS = Path(__file__).resolve().parent
 WORKSPACE = TESTS.parents[3]
+sys.path.insert(0, str(TESTS.parent / "scripts"))
+import finops
 DEFAULT_CLOCK = "2026-10-30T00:00:00Z"
 Json = dict[str, Any]
 BAD = {"failure", "error", "unexpected-success"}
@@ -108,21 +109,7 @@ def classify(result: unittest.TestResult) -> str:
 
 
 def fingerprint() -> Json:
-    paths = [WORKSPACE / "README.md", WORKSPACE / "TEST-STRATEGY.md",
-             WORKSPACE / ".github" / "agents" / "FinOpsAgent.agent.md"]
-    skills = WORKSPACE / ".github" / "skills"
-    paths.extend(skills.glob("*\\SKILL.md"))
-    paths.extend((TESTS.parent / "scripts").glob("*.py"))
-    paths.extend(TESTS.glob("*.py"))
-    paths.extend(TESTS.glob("*.json"))
-    paths.extend((TESTS.parent / "assets").glob("*.json"))
-    paths.extend((TESTS.parent / "references").glob("*.md"))
-    setup = WORKSPACE / "tools" / "verification_setup"
-    paths.extend(setup.glob("*.py"))
-    paths.extend((setup / "static").glob("*"))
-    hashes = {str(path.relative_to(WORKSPACE)): hashlib.sha256(path.read_bytes()).hexdigest()
-              for path in sorted(set(paths)) if path.is_file()}
-    return {"sha256": hashlib.sha256(json.dumps(hashes, sort_keys=True).encode()).hexdigest(), "files": hashes}
+    return finops.source_fingerprint()
 
 
 def save_reports(directory: Path, stem: str, report: Json) -> None:
@@ -278,17 +265,23 @@ def run_portal_stage(config: Path, mode: str, confirmation: str | None, director
                                    timeout=600, check=False)
     except subprocess.TimeoutExpired:
         return {"status": "BLOCKED", "mode": mode, "error": "Portal validation exceeded 600s."}
-    reports = list(portal_root.glob("*\\report.json"))
+    reports = [path for folder in portal_root.iterdir() for path in folder.glob("report.json")] \
+        if portal_root.is_dir() else []
     if len(reports) != 1:
         return {"status": "BLOCKED", "mode": mode, "error": "Portal validation did not produce exactly one report."}
-    result = json.loads(reports[0].read_text(encoding="utf-8"))
+    try:
+        result = finops.read_json(reports[0])
+    except (finops.EvidenceError, OSError, ValueError) as exc:
+        return {"status": "BLOCKED", "mode": mode, "error": f"Invalid Portal report: {exc}"}
     result["reportPath"] = str(reports[0].with_suffix(".md"))
     result["reportRelativePath"] = str(reports[0].with_suffix(".md").relative_to(directory)).replace("\\", "/")
     expected = "LIVE_PORTAL_PARITY_PASS" if mode == "live" else "CAPTURED_PORTAL_PARITY_PASS"
-    if result.get("status") == expected:
+    if result.get("status") in ("LIVE_PORTAL_PARITY_PASS", "CAPTURED_PORTAL_PARITY_PASS"):
         live = mode == "live"
-        if completed.returncode != 0 or result.get("mode") != mode or \
-                result.get("liveQueryExecuted") is not live or result.get("identityVerifiedThisRun") is not live:
+        if result["status"] != expected or completed.returncode != 0 or result.get("mode") != mode or \
+                result.get("liveQueryExecuted") is not live or result.get("identityVerifiedThisRun") is not live or \
+                not isinstance(result.get("source"), dict) or \
+                result["source"].get("sha256") != fingerprint()["sha256"]:
             return {"status": "BLOCKED", "mode": mode, "error": "Portal report/exit/identity proof is inconsistent."}
     return result
 

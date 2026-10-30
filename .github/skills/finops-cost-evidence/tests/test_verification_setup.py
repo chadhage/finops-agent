@@ -56,7 +56,7 @@ class SetupCase(portal_fixture.PortalCase):
         directory.mkdir(parents=True)
         report = {"verdict": verdict, "negativeComplete": negative_complete,
                   "acceptanceValidated": False, "livePortalValidated": False, "results": [],
-                  "portalParity": {"status": "NOT RUN"}}
+                  "portalParity": {"status": "NOT RUN"}, "source": self.app.read_record(identifier)["source"]}
         (directory / "report.json").write_text(json.dumps(report), encoding="utf-8")
         return report
 

@@ -54,7 +54,7 @@ class NegativeUncoveredPaths(matrix.CliCase):
             with patch("sys.stdout", new_callable=io.StringIO), patch.object(finops, "AzureClient") as azure:
                 status = portal.main(["--config", str(config), "--mode", "live", "--out-dir", directory])
             self.assertEqual(status, 2)
-            report = finops.read_json(next(Path(directory).glob("*\\report.json")))
+            report = finops.read_json(next(Path(directory).rglob("report.json")))
             self.assertEqual(report["status"], "BLOCKED")
             azure.assert_not_called()
 
@@ -77,7 +77,7 @@ class NegativeUncoveredPaths(matrix.CliCase):
                 status = run_tests.main(["--offline-only", "--portal-config", "not-read.json",
                                          "--out-dir", directory, "--repeat", "1"])
             self.assertEqual(status, 2)
-            report = json.loads(next(Path(directory).glob("*\\report.json")).read_text(encoding="utf-8"))
+            report = json.loads(next(Path(directory).rglob("report.json")).read_text(encoding="utf-8"))
             self.assertFalse(report["acceptanceValidated"])
             self.assertIn("cannot be combined", "\n".join(report["errors"]))
 
