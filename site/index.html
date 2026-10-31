@@ -331,7 +331,7 @@ No token written to the artifact</pre></div>
           <details class="step">
             <summary><span class="step-index">02</span><span class="step-title">Resolve the exact current workload.</span></summary>
             <div class="step-content">
-              <div><p>Collect paginated Resource Graph inventory. Intersect approved subscription/MG, resource-group, owner, tag, and region filters. Resolve ambiguous names before proceeding, and show the manifest for approval.</p><p>Business ownership needs approved source evidence; a ServiceNow connector is not automatically included.</p><a href="https://github.com/chadhage/finops-agent/blob/main/.github/skills/finops-scope-resolution/SKILL.md">Read the scope-resolution skill</a></div>
+              <div><p>Collect paginated Resource Graph inventory. Intersect approved subscription/MG, resource-group, owner, tag, and region filters. Resolve ambiguous names before proceeding, and show the manifest for approval.</p><p>Resource-level filters select current resources, excluding deleted resources and unallocated charges outside that set. Subscription/MG-only selection instead includes all charges in the selected subscriptions.</p><p>Business ownership needs approved source evidence; a ServiceNow connector is not automatically included.</p><a href="https://github.com/chadhage/finops-agent/blob/main/.github/skills/finops-scope-resolution/SKILL.md">Read the scope-resolution skill</a></div>
               <div class="artifact"><div class="eyebrow">Helper commands &rarr; artifacts</div><pre>inventory &rarr; catalog.json
 resolve &rarr; manifest.json
 Exact resource IDs + source provenance</pre></div>
@@ -340,7 +340,7 @@ Exact resource IDs + source provenance</pre></div>
           <details class="step">
             <summary><span class="step-index">03</span><span class="step-title">Capture cost without losing the source precision.</span></summary>
             <div class="step-content">
-              <div><p>Generate sealed detail/control requests for the approved period and ActualCost or AmortizedCost basis. Query every disjoint resource chunk and continuation page. Parse money directly into Decimal and keep currencies separate.</p><a href="https://github.com/chadhage/finops-agent/blob/main/.github/skills/finops-cost-evidence/scripts/finops.py">Inspect the Python helper</a></div>
+              <div><p>Generate sealed detail/control requests for the approved period and ActualCost or AmortizedCost basis. Query every disjoint resource chunk and continuation page. Parse money directly into Decimal and keep currencies separate.</p><p>Shared checks reject known credential/header fields in evidence objects and raw response JSON before import, capture, snapshot, or publication. This is not a universal secret detector: operators must still sanitize exports and never supply tokens or unsanitized HAR files.</p><a href="https://github.com/chadhage/finops-agent/blob/main/.github/skills/finops-cost-evidence/scripts/finops.py">Inspect the Python helper</a></div>
               <div class="artifact"><div class="eyebrow">Helper commands &rarr; artifacts</div><pre>plan &rarr; plan.json
 query &rarr; actual.json
 Raw pages + request IDs + times + hashes</pre></div>
@@ -349,7 +349,7 @@ Raw pages + request IDs + times + hashes</pre></div>
           <details class="step">
             <summary><span class="step-index">04</span><span class="step-title">Compare the rows, not just the grand total.</span></summary>
             <div class="step-content">
-              <div><p>Require identical plans and exact resource/day/location/currency values. Portal acceptance also needs genuine Portal exports, matching displayed amounts after aggregation, and independently verified resource membership.</p><p>Supplied-evidence comparison and fresh, explicitly approved live validation have different statuses. A second CLI query is not Portal evidence.</p><a href="https://github.com/chadhage/finops-agent/blob/main/.github/skills/finops-cost-evidence/references/portal-validation.md">Read the Portal validation contract</a></div>
+              <div><p>Require identical plans and exact resource/day/location/currency values. Portal acceptance also needs genuine Portal exports, matching displayed amounts after aggregation, and independently verified resource membership.</p><p>An exact-match manifest embeds the complete independent resource reference. Plan checks recompute its scenario binding, resource-set equality, and provenance rather than trusting a status flag or hash. Hashes detect changes, not authenticity.</p><p>Supplied-evidence comparison and fresh, explicitly approved live validation have different statuses. A second CLI query is not Portal evidence.</p><a href="https://github.com/chadhage/finops-agent/blob/main/.github/skills/finops-cost-evidence/references/portal-validation.md">Read the Portal validation contract</a></div>
               <div class="artifact"><div class="eyebrow">Acceptance boundary</div><pre>import-reference + reconcile
 Raw monetary tolerance: 0
 Missing, partial, or mismatched evidence:
@@ -359,7 +359,7 @@ no validated claim</pre></div>
           <details class="step">
             <summary><span class="step-index">05</span><span class="step-title">Give the owner the same evidence in a useful format.</span></summary>
             <div class="step-content">
-              <div><p>Markdown is the default. Repack the same evidence as standalone HTML or a locally generated PDF, without querying Azure again. Keep exact amounts, scope, coverage warnings, and validation status together.</p><a href="https://github.com/chadhage/finops-agent/blob/main/.github/skills/finops-reporting/SKILL.md">Read the reporting skill</a></div>
+              <div><p>Markdown is the default. Repack the same evidence as standalone HTML or a locally generated PDF, without querying Azure again. Keep exact amounts, scope, coverage warnings, and validation status together.</p><p>Completed helper/PDF artifacts use atomic create-only publication via local hard links, supported by filesystems such as NTFS or ext4. Existing files are not overwritten; unsupported publication fails explicitly instead of leaving a partial final artifact. Use a new per-run directory.</p><a href="https://github.com/chadhage/finops-agent/blob/main/.github/skills/finops-reporting/SKILL.md">Read the reporting skill</a></div>
               <div class="artifact"><div class="eyebrow">One model, three outputs</div><pre>report &rarr; Markdown
        &rarr; standalone HTML
        &rarr; PDF via installed Chromium
@@ -368,6 +368,7 @@ No automatic publication of cost evidence</pre></div>
           </details>
         </div>
         <p class="skill-line">The fifth skill, <a href="https://github.com/chadhage/finops-agent/blob/main/.github/skills/azure-cost-management/SKILL.md">Azure Cost Management documentation</a>, fetches official guidance on demand. A documentation citation is not proof of customer spend or live permissions.</p>
+        <div class="decision-path"><strong>Reusing an older exact-match manifest or plan?</strong><p>Rebuild it with the original independent resource reference, review the new manifest and plan, and approve the new plan hash. Legacy artifacts without the embedded reference are blocked; copying a validation flag is not a migration. See the <a href="https://github.com/chadhage/finops-agent/blob/main/.github/skills/finops-cost-evidence/references/evidence-contract.md">evidence contract</a>.</p></div>
       </section>
 
       <section class="section" id="audience" aria-labelledby="audience-title">
@@ -390,14 +391,15 @@ No automatic publication of cost evidence</pre></div>
         </div>
         <div class="reality">
           <div>
-            <div class="status-line"><span class="status-dot" aria-hidden="true"></span>Reference implementation · validation in progress</div>
+            <div class="status-line"><span class="status-dot" aria-hidden="true"></span>Reference implementation · release qualification blocked</div>
             <h3>Check the status before using a result.</h3>
             <ul>
               <li><strong>BLOCKED:</strong> required inputs or complete, consistent evidence are missing.</li>
               <li><strong>UNVERIFIED:</strong> independent resource or cost references are absent.</li>
               <li><strong>Validated against captured references:</strong> bounded to the recorded comparison, not future data or final invoices.</li>
             </ul>
-            <p class="readiness-note">An earlier 30 October 2026 expanded campaign exposed 11 reproducible failing cases. Fixes require fresh current-source regression evidence; a historical report is not current qualification. Offline checks and restricted model probes do not certify live Portal parity. Consult the current code and validation evidence before acceptance.</p>
+            <p class="readiness-note">The <a href="https://github.com/chadhage/finops-agent/actions/runs/41146150954">reviewed 30 October 2026 hardening CI run</a> failed three of its four offline matrix jobs. Its passing microsite check validates only static publication, not cross-platform helper behavior or release acceptance. Inspect later runs before treating regression checks as green.</p>
+            <p class="readiness-note">Regression evidence must match the current source fingerprint. Earlier failure reports and later passing reports are historical evidence, not automatic qualification of changed code. A helper-suite pass does not certify live Portal parity, tool-enabled agent behavior, or a production release.</p>
           </div>
           <div>
             <h3>What this is not</h3>
@@ -410,6 +412,15 @@ No automatic publication of cost evidence</pre></div>
             <p class="readiness-note"><a href="https://github.com/chadhage/finops-agent/blob/main/TEST-STRATEGY.md">Inspect the negative-first test strategy</a>. Azure data can arrive late or be rerated; maintain the evidence window and caveats.</p>
           </div>
         </div>
+        <div id="verification">
+          <h3 id="verification-title">Separate checks. Separate claims.</h3>
+          <div class="architecture" aria-labelledby="verification-title">
+            <div><strong>Offline regression</strong><span>The <a href="https://github.com/chadhage/finops-agent/blob/main/.github/workflows/verification.yml">core regression workflow</a> runs ten negative-first repetitions on Windows and Linux with Python 3.11 and the latest stable Python, plus real local CLI controls. It uses synthetic evidence, not Azure credentials. A configured workflow is not a passing CI run or required branch protection.</span></div>
+            <div><strong>Local integration</strong><span>Separate checks exercise real CLI, browser/PDF output, and setup-page interactions. Browser/PDF checks require an explicitly selected installed browser; offline mocks or CLI-only CI do not satisfy them. The <a href="https://github.com/chadhage/finops-agent/blob/main/wiki/verification-setup.md">local verification utility</a> prepares reviewable snapshots and blocks starting a setup if its source fingerprint changes.</span></div>
+            <div><strong>Acceptance and pilot</strong><span>Genuine captured Portal parity, freshly approved live parity, full tool-enabled agent traces, and supervised operator review remain separate gates. Restricted tools-disabled model probes do not prove approval ordering. Missing evidence is NOT RUN or BLOCKED, never PASS.</span></div>
+          </div>
+          <p class="readiness-note">The <a href="https://github.com/chadhage/finops-agent/blob/main/TEST-STRATEGY.md#promise-to-evidence-acceptance-matrix">promise-to-evidence acceptance matrix</a> defines each gate. Coverage measures executable lines, not branches or model compliance. The local setup page does not authenticate Azure or run live verification, and this public microsite does not publish private run reports.</p>
+        </div>
       </section>
 
       <section class="section" id="start" aria-labelledby="start-title">
@@ -419,7 +430,7 @@ No automatic publication of cost evidence</pre></div>
             <h2 id="start-title">Bring a question. Approve a boundary.</h2>
             <ol class="start-list">
               <li>Open the repository in VS Code with Copilot agent support.</li>
-              <li>Use Python 3.11+ and your own interactive Azure CLI identity, with appropriate resource/cost read access.</li>
+              <li>Use Python 3.11+ and your own interactive Azure CLI identity, with appropriate resource/cost read access. No Python packages, Azure MCP server, or Azure deployment are required for the core workflow; do not request Owner just for analysis.</li>
               <li>Select FinOpsAgent. Confirm the tenant, invoker, exact subscriptions, UTC dates, cost basis, and filters.</li>
               <li>Review the resolved manifest before cost collection. Supply genuine references before claiming validation.</li>
             </ol>

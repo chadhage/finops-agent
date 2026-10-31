@@ -11,7 +11,7 @@ from urllib.parse import unquote, urlsplit
 ROOT = Path(__file__).resolve().parents[1]
 SITE = ROOT / "site"
 ALLOWED = {"index.html", "licenses/Apache-2.0.txt"}
-REQUIRED_SECTIONS = {"main", "why", "zava", "workflow", "audience", "readiness", "start"}
+REQUIRED_SECTIONS = {"main", "why", "zava", "workflow", "audience", "readiness", "verification", "start"}
 
 
 class Page(HTMLParser):
@@ -87,8 +87,11 @@ def main() -> None:
         assert not re.search(r"\b(fetch|XMLHttpRequest|WebSocket|eval)\s*\(", script), "No public data/API connection."
         assert not re.search(r"\b(localStorage|sessionStorage|document\.cookie)\b", script), "No tracking storage."
     text = " ".join(page.text)
-    for required in ("Zava", "read-only", "Decimal", "UNVERIFIED", "BLOCKED", "CC BY 4.0",
-                     "not production-certified", "11 reproducible failing cases", "not Portal evidence"):
+    for required in ("Zava", "read-only", "Decimal", "UNVERIFIED", "BLOCKED", "NOT RUN", "CC BY 4.0",
+                     "not production-certified", "not Portal evidence", "current source fingerprint",
+                     "complete independent resource reference", "not a universal secret detector",
+                     "atomic create-only publication", "hard links",
+                     "Restricted tools-disabled model probes"):
         assert required in text, f"Missing purpose or limitation: {required}."
     assert "DTNA" not in source, "The microsite must use only the approved illustrative Zava context."
     assert not re.search(r"\b[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\b", source, re.I), "No tenant/resource UUIDs."
